@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typing Authentication</title>
+    <style>
+      /* Reset some default styles */
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Arial", sans-serif;
+        background-color: #f0f4f8;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+      }
+
+      .container {
+        background: white;
+        padding: 40px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        width: 100%;
+        max-width: 400px;
+      }
+
+      h1 {
+        color: #333;
+        margin-bottom: 20px;
+        font-size: 24px;
+      }
+
+      #typing-area {
+        width: 100%;
+        padding: 15px;
+        border: 2px solid #007bff;
+        border-radius: 5px;
+        font-size: 18px;
+        color: #333;
+        outline: none;
+        transition: border-color 0.3s ease-in-out;
+      }
+
+      #typing-area:focus {
+        border-color: #0056b3;
+      }
+
+      .status {
+        margin-top: 20px;
+        font-size: 18px;
+        color: #007bff;
+      }
+
+      .error {
+        color: #dc3545;
+      }
+
+      .success {
+        color: #28a745;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Continuous Typing Authentication</h1>
+      <input type="text" id="typing-area" placeholder="Start typing..." />
+
+      <div id="status" class="status">Waiting for keystrokes...</div>
+    </div>
+
+    <script>
+      let keystrokes = [];
+      const threshold = 10; // Number of keystrokes before sending data
+      const timeLimit = 10000; // Time limit in milliseconds (10 seconds)
+      let startTime = Date.now();
+
+      // Capture real-time keystrokes
+      document
+        .getElementById("typing-area")
+        .addEventListener("keydown", function (event) {
+          const currentTime = Date.now();
+          const timeDiff =
+            currentTime -
+            (keystrokes.length > 0
+              ? keystrokes[keystrokes.length - 1].timestamp
+              : startTime);
+
+          keystrokes.push({
+            key: event.key,
+            timestamp: currentTime,
+            timeDiff: timeDiff,
+          });
+
+          console.log(
+            "Keystroke captured:",
+            event.key,
+            "Time difference:",
+            timeDiff
+          );
+
+          // Check if threshold is reached or time limit is exceeded
+          if (
+            keystrokes.length >= threshold ||
+            currentTime - startTime >= timeLimit
+          ) {
+            sendKeystrokeData(keystrokes);
+            keystrokes = []; // Reset keystrokes after sending data
+            startTime = currentTime; // Reset the start time
+          }
+        });
+
+      // Function to send keystroke data to the backend
+      async function sendKeystrokeData(data) {
+        const timeDiffs = data.map((k) => k.timeDiff); // Only send time differences
+        console.log("Sending time differences:", timeDiffs); // Log the time differences
+
+        try {
+          const response = await fetch("http://127.0.0.1:5000/authenticate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ timeDiffs: timeDiffs }),
+          });
+
+          console.log("Response status:", response.status); // Log response status
+
+          const result = await response.json();
+          console.log("Backend response:", result); // Log backend response
+
+          const statusDiv = document.getElementById("status");
+
+          if (result.status === "Anomaly Detected") {
+            statusDiv.textContent =
+              "Anomaly Detected! You might be a different user.";
+            statusDiv.classList.add("error");
+            statusDiv.classList.remove("success");
+          } else if (result.status === "Authenticated") {
+            statusDiv.textContent = "Authenticated!";
+            statusDiv.classList.add("success");
+            statusDiv.classList.remove("error");
+          }
+        } catch (error) {
+          console.error("Error during authentication:", error);
+          const statusDiv = document.getElementById("status");
+          statusDiv.textContent = "Error in authentication. Please try again.";
+          statusDiv.classList.add("error");
+          statusDiv.classList.remove("success");
+        }
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Typing Authentication</title>
+  </head>
+  <body>
+    <h1>Type here for authentication...</h1>
+    <input type="text" id="typing-area" placeholder="Start typing..." />
+
+    <script>
+      let keystrokes = [];
+      const threshold = 10; // Number of keystrokes before sending data
+      const timeLimit = 10000; // Time limit in milliseconds (10 seconds)
+      let startTime = Date.now();
+
+      // Capture real-time keystrokes
+      document
+        .getElementById("typing-area")
+        .addEventListener("keydown", function (event) {
+          const currentTime = Date.now();
+          const timeDiff =
+            currentTime -
+            (keystrokes.length > 0
+              ? keystrokes[keystrokes.length - 1].timestamp
+              : startTime);
+
+          keystrokes.push({
+            key: event.key,
+            timestamp: currentTime,
+            timeDiff: timeDiff,
+          });
+
+          console.log(
+            "Keystroke captured:",
+            event.key,
+            "Time difference:",
+            timeDiff
+          ); // Log the keystroke and time difference
+
+          // Check if threshold is reached or time limit is exceeded
+          if (
+            keystrokes.length >= threshold ||
+            currentTime - startTime >= timeLimit
+          ) {
+            sendKeystrokeData(keystrokes);
+            keystrokes = []; // Reset keystrokes after sending data
+            startTime = currentTime; // Reset the start time
+          }
+        });
+
+      // Function to send keystroke data to the backend
+      async function sendKeystrokeData(data) {
+        const timeDiffs = data.map((k) => k.timeDiff); // Only send time differences
+        console.log("Sending time differences:", timeDiffs); // Log the time differences
+        try {
+          const response = await fetch("http://127.0.0.1:5000/authenticate", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ timeDiffs: timeDiffs }),
+          });
+
+          const result = await response.json();
+          if (result.status === "Anomaly Detected") {
+            alert("Anomaly Detected! You might be a different user.");
+          } else if (result.status === "Authenticated") {
+            alert("Authenticated!");
+          }
+        } catch (error) {
+          console.error("Error during authentication:", error);
+        }
+      }
+    </script>
+  </body>
+</html>
